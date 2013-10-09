@@ -17,6 +17,8 @@ public:
     double KW;
     double K2;
 
+    double KH;
+
     Constants(double T) {
         DCO2 = 1E-5*(0.56 + 0.058*T);
         DIon = 0.7*DCO2;
@@ -33,6 +35,9 @@ public:
         K2 = pow(10.0, -107.8871 + 5151.79/T - 0.03252849*T + 38.9256*log10(T) -
         563713.9/(T*T));
 
+        KH = pow(10.0, 108.3865 - 6919.53/T + 0.01985076*T - 40.45154*log10(T) + 669365/(T*T));
+
+
         std::cout << DCO2 << std::endl;
         std::cout << DIon << std::endl;
         std::cout << k1   << std::endl;
@@ -41,6 +46,8 @@ public:
         std::cout << kM2  << std::endl;
         std::cout << KW   << std::endl;
         std::cout << K2   << std::endl;
+        std::cout << KH   << std::endl;
+
 
     }
 

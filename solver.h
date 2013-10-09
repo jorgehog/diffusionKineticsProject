@@ -16,7 +16,10 @@ public:
 
     const int N;
 
-    Solver(DiffusionScheme *scheme, int N, double T);
+    double Patm;
+    double Pres;
+
+    Solver(DiffusionScheme *scheme, int N, double T, double Patm, double Pres);
 
     DiffusionScheme* scheme;
 
@@ -36,17 +39,25 @@ public:
     double Cl;
     double K;
 
+    vec mg_cm2_s;
+
     void run(int tSteps);
 
-    void iterateKinetics();
+    void diffuse(vec & u, double D);
 
     void setBoundaryAndInitialConditions();
+
+    void iterateKinetics();
 
 
     double charge(double pH);
     double bisectRootCharge();
     void chargeBalance();
     int j;
+
+    void gasExchange();
+
+    void precipitateDisolve();
 
 
     double k1() {
@@ -73,7 +84,9 @@ public:
         return constants->K2;
     }
 
-
+    double KH() {
+        return constants->KH;
+    }
 
 };
 

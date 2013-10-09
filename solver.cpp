@@ -5,10 +5,12 @@
 #include <assert.h>
 #include <iomanip>
 
-Solver::Solver(DiffusionScheme *scheme, int N, double T) :
+Solver::Solver(DiffusionScheme *scheme, int N, double T, double Patm, double Pres) :
     N(N),
     scheme(scheme),
-    constants(new Constants(T))
+    constants(new Constants(T)),
+    Patm(Patm),
+    Pres(Pres)
 {
     assert(N > 1);
     u.set_size(N);
@@ -23,6 +25,8 @@ Solver::Solver(DiffusionScheme *scheme, int N, double T) :
 
     Ca.set_size(N);
 
+    mg_cm2_s.set_size(N);
+
 }
 
 void Solver::run(int tSteps)
@@ -31,21 +35,33 @@ void Solver::run(int tSteps)
 
     setBoundaryAndInitialConditions();
 
-    vec uNew(N);
     for (int t; t < tSteps; ++t){
 
-        for (int i = 1; i < N-1; ++i) {
-            uNew(i) = u(i) + scheme->nextTimeStep(u, constants->DCO2, i);
-        }
+        diffuse(CO2, constants->DCO2);
+        diffuse(Ca,  constants->DIon);
+        diffuse(c,   constants->DIon);
+
+        chargeBalance();
 
         iterateKinetics();
 
-        cout << setw(5) << t/(tSteps-1.0)*100 << " %" << endl;
+        precipitateDisolve();
 
-        u(span(1, N-1)) = uNew(span(1, N-1));
+        gasExchange();
+
+        cout << setw(5) << t/(tSteps-1.0)*100 << " %" << endl;
 
     }
 
+}
+
+void Solver::diffuse(vec &u, double D)
+{
+    vec uNew(N-2);
+    for (int i = 1; i < N-1; ++i) {
+        uNew(i-1) = u(i) + scheme->nextTimeStep(u, D, i);
+    }
+    u(span(1, N-2)) = uNew;
 }
 
 void Solver::iterateKinetics()
@@ -55,9 +71,8 @@ void Solver::iterateKinetics()
     CO2 += scheme->dt*dCO2;
     c   -= scheme->dt*dCO2;
 
-    chargeBalance();
-
 }
+
 
 
 void Solver::setBoundaryAndInitialConditions()
@@ -65,17 +80,19 @@ void Solver::setBoundaryAndInitialConditions()
     u(1) = u(0);
     u(N-1) = u(N-2); // TRUE?
 
-    CO2.randu();
-    c.randu();
+    CO2.fill(KH()*Patm); //Henry's law
+    c.zeros();
 
-    H.randu();
-    OH.randu();
-    HCO3.randu();
-    CO3.randu();
+    Cl = 0.04;
+    Ca.fill(0.5*Cl);
+    K = 0.02;
 
-    Ca.randu();
-    Cl = as_scalar(randu<vec>(1));
-    K = as_scalar(randu<vec>(1));
+    H.zeros();
+    OH.zeros();
+    HCO3.zeros();
+    CO3.zeros();
+    mg_cm2_s.zeros();
+
 }
 
 
@@ -101,7 +118,7 @@ double Solver::bisectRootCharge()
     double b = 14;
     double c;
 
-    double eps = 1E-16;
+    double eps = 1E-3;
 
     while (N < Nmax){
         c = (a + b)/2;
@@ -131,6 +148,7 @@ void Solver::chargeBalance()
 
     double pH;
 
+    //member j is needed by charge function.
     for (j = 0; j < N; ++j) {
 
         pH = bisectRootCharge();
@@ -139,6 +157,37 @@ void Solver::chargeBalance()
         OH(j)   = KW()/H(j);             // Eq. (9)
         HCO3(j) = H(j)*c(j)/(K2()+H(j)); // Eq. (10)
         CO3(j)  = K2()*HCO3(j)/H(j);     // Eq. (11)
+    }
+
+
+
+}
+
+void Solver::gasExchange()
+{
+
+    double k = 3E-4;
+
+    double FCO2 = k*(KH()*Pres - CO2(N-1));
+    CO2(N-1) = CO2(N-1) + scheme->dt*FCO2/scheme->dx;
+
+
+}
+
+void Solver::precipitateDisolve()
+{
+
+    double F, delta;
+    for (int j = 1; j < N; ++j) {
+
+        F = 1000*(9.5e-11 - (7.14e-3)*Ca(j)*CO3(j)); // Compton-Pritchard
+
+        delta = scheme->dt*F/scheme->dx;
+        Ca(j) = Ca(j) + delta;
+        c(j) = c(j) + delta;
+
+        mg_cm2_s(j) = -F*100; // Molecular weight of CaCO3
+
     }
 
 

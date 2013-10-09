@@ -12,6 +12,8 @@ struct configParams {
     double D;
     double T;
     double dt;
+    double Patm;
+    double Pres;
 };
 
 #endif // DIFFUSIONKINETICS_H

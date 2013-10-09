@@ -26,7 +26,7 @@ int main(int argc, char ** argv)
 
 
     //Create and run the solver
-    Solver solver(scheme, cfgParams.N, cfgParams.T);
+    Solver solver(scheme, cfgParams.N, cfgParams.T, cfgParams.Patm, cfgParams.Pres);
     solver.run(cfgParams.nSteps);
 
     return 0;
@@ -44,11 +44,15 @@ void parseConfigFile(const char *filename, configParams &cfgParams){
     cfgParams.type = static_cast<SCEMETYPE>((int)cfg.lookup("scheme.type"));
 
     cfgParams.H  = cfg.lookup("environment.H");
-    cfgParams.T  = cfg.lookup("environment.T");
+    cfgParams.T  = (double)cfg.lookup("environment.T") + 273.15;
 
     cfgParams.dt = cfg.lookup("solver.dt");
     cfgParams.N  = cfg.lookup("solver.N");
     cfgParams.nSteps = cfg.lookup("solver.steps");
+
+    cfgParams.Patm = cfg.lookup("environment.Patm");
+    cfgParams.Pres = ((double)cfg.lookup("environment.PresOverPatm"))*cfgParams.Patm;
+
 }
 
 DiffusionScheme* selectScheme(SCEMETYPE type, double dx, double dt) {
