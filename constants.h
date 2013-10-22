@@ -20,7 +20,11 @@ public:
     double KH;
 
     Constants(double T) {
-        DCO2 = 1E-5*(0.56 + 0.058*T);
+
+        //T is in kelvin
+        double Tc = T - 273.15;
+
+        DCO2 = 1E-5*(0.56 + 0.058*Tc);
         DIon = 0.7*DCO2;
 
         k1 = pow(10.0, 329.850-110.54*log10(T)-17265.4/T);

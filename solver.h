@@ -16,16 +16,14 @@ public:
 
     const int N;
 
-    double Patm;
-    double Pres;
-
     Solver(DiffusionScheme *scheme, int N, double T, double Patm, double Pres);
 
     DiffusionScheme* scheme;
 
     Constants * constants;
 
-    vec u;
+    double Patm;
+    double Pres;
 
     vec CO2;
     vec c;
@@ -42,6 +40,8 @@ public:
     vec mg_cm2_s;
 
     void run(int tSteps);
+
+    void dump(int i);
 
     void diffuse(vec & u, double D);
 

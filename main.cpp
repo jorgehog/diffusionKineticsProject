@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <libconfig.h++>
+#include <DCViz.h>
 #include <assert.h>
 
 using namespace libconfig;
@@ -15,6 +16,10 @@ int main(int argc, char ** argv)
     //LOADING CONFIG
     assert(argc > 1 && "Config file not supplied.");
     configParams cfgParams;
+
+    DCViz viz("/tmp/concOut0.arma");
+    viz.launch(true, 0, 16, 14);
+
     parseConfigFile(argv[1], cfgParams);
 
 

@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <iomanip>
+#include <sstream>
 
 Solver::Solver(DiffusionScheme *scheme, int N, double T, double Patm, double Pres) :
     N(N),
@@ -13,7 +14,6 @@ Solver::Solver(DiffusionScheme *scheme, int N, double T, double Patm, double Pre
     Pres(Pres)
 {
     assert(N > 1);
-    u.set_size(N);
 
     CO2.set_size(N);
     c.set_size(N);
@@ -35,7 +35,7 @@ void Solver::run(int tSteps)
 
     setBoundaryAndInitialConditions();
 
-    for (int t; t < tSteps; ++t){
+    for (int t = 0; t < tSteps; ++t){
 
         diffuse(CO2, constants->DCO2);
         diffuse(Ca,  constants->DIon);
@@ -49,9 +49,30 @@ void Solver::run(int tSteps)
 
         gasExchange();
 
+        dump(t);
+
         cout << setw(5) << t/(tSteps-1.0)*100 << " %" << endl;
 
     }
+
+}
+
+void Solver::dump(int i)
+{
+//    c, co2, ca, H, OH, mass
+    mat A(N, 6);
+
+    A.col(0) = c;
+    A.col(1) = CO2;
+    A.col(2) = Ca;
+    A.col(3) = H;
+    A.col(4) = OH;
+    A.col(5) = mg_cm2_s;
+
+    std::stringstream s;
+    s << "/tmp/concOut" << i << ".arma";
+
+    A.save(s.str());
 
 }
 
@@ -77,18 +98,21 @@ void Solver::iterateKinetics()
 
 void Solver::setBoundaryAndInitialConditions()
 {
-    u(1) = u(0);
-    u(N-1) = u(N-2); // TRUE?
 
-    CO2.fill(KH()*Patm); //Henry's law
+//    CO2.fill(KH()*Patm); //Henry's law
+    CO2.zeros();
     c.zeros();
 
-    Cl = 0.04;
+    Cl = 0.046;
     Ca.fill(0.5*Cl);
-    K = 0.02;
+//    K = 0.02;
+    K = 0;
 
     H.zeros();
+
     OH.zeros();
+    OH(0) = 2*Ca(0);
+
     HCO3.zeros();
     CO3.zeros();
     mg_cm2_s.zeros();
@@ -111,20 +135,19 @@ double Solver::charge(double pH)
 
 double Solver::bisectRootCharge()
 {
-    int Nmax = 1E7;
+    int Nmax = 1E5;
     int N = 0;
 
     double a = 0;
     double b = 14;
     double c;
 
-    double eps = 1E-3;
+    double eps = 1E-10;
 
     while (N < Nmax){
         c = (a + b)/2;
 
         if (fabs(charge(c)) < eps){
-            std::cout << "yay" << charge(c) << std::endl;
             return c;
         }
 
@@ -169,7 +192,7 @@ void Solver::gasExchange()
     double k = 3E-4;
 
     double FCO2 = k*(KH()*Pres - CO2(N-1));
-    CO2(N-1) = CO2(N-1) + scheme->dt*FCO2/scheme->dx;
+    CO2(N-1) += scheme->dt*FCO2/scheme->dx;
 
 
 }
@@ -183,8 +206,8 @@ void Solver::precipitateDisolve()
         F = 1000*(9.5e-11 - (7.14e-3)*Ca(j)*CO3(j)); // Compton-Pritchard
 
         delta = scheme->dt*F/scheme->dx;
-        Ca(j) = Ca(j) + delta;
-        c(j) = c(j) + delta;
+        Ca(j) += delta;
+        c(j)  += delta;
 
         mg_cm2_s(j) = -F*100; // Molecular weight of CaCO3
 
