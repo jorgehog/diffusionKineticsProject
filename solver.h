@@ -26,6 +26,7 @@ public:
     double Pres;
 
     bool superOutput = false;
+    int outTresh = 250;
 
     vec CO2;
     vec c;

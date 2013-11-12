@@ -76,6 +76,9 @@ void Solver::run(int tSteps)
 
 void Solver::dump(int i)
 {
+
+    if (!(i%outTresh == 0)) return;
+
 //    c, co2, ca, H, OH, mass
     mat A(N, 8);
 
@@ -89,7 +92,7 @@ void Solver::dump(int i)
     A.col(7) = pH;
 
     std::stringstream s;
-    s << "/home/jorgehog/scratch/concOut" << i << ".arma";
+    s << "/tmp/concOut" << i << ".arma";
 
     A.save(s.str());
 
@@ -249,7 +252,7 @@ double Solver::bisectRootCharge()
     double b = 14;
     double C;
 
-    double eps = 0;
+    double eps = 0.01;
 
 
     double delta = 0.001;
@@ -270,11 +273,12 @@ double Solver::bisectRootCharge()
 //    }
 //    std::cout << charge(a)*charge(b) << std::endl;
 
-
+    double CPrev = 10000;
     while (N < Nmax){
         C = (a + b)/2;
 
-        if (fabs(charge(C)) < eps){
+        if (fabs(CPrev - C) < eps){
+//            std::cout << N << std::endl;
             return C;
         }
 
@@ -283,6 +287,8 @@ double Solver::bisectRootCharge()
         } else {
             b = C;
         }
+
+        CPrev = C;
 
         N++;
     }
@@ -296,7 +302,7 @@ double Solver::newtonMethodRootCharge(double start)
     double a0 = 0;
     double a1 = start;
 
-    double eps = 1E-15;
+    double eps = 1E-8;
     int NMAX = (int)1E5;
 
     int N = 0;
@@ -315,6 +321,8 @@ double Solver::newtonMethodRootCharge(double start)
 //        std::cout << "new solution "<< a1<< "  " << fabs(charge(a1)) <<  std::endl;
     }
 
+//    std::cout << N << "  " << charge(a1) << std::endl;
+
 //    std::cout << N << std::endl;
 
     return a1;
@@ -328,7 +336,8 @@ double Solver::secantMethod(double start)
     double a0 = start + start/10;
 
     double eps = 1E-15;
-    int NMAX = (int)1E5;
+    int NMAX;
+    NMAX = (int)1000;
 
     int N = 0;
 
@@ -342,6 +351,7 @@ double Solver::secantMethod(double start)
 
         N++;
     }
+//    std::cout << N << std::endl;
 
     return a1;
 }
@@ -357,9 +367,9 @@ void Solver::chargeBalance()
 //        pH = fixPoint(7);
         pH = bisectRootCharge();
 //        std::cout << pH << "  " << charge(pH) << std::endl;
-//        pH = secantMethod(pH);
+        pH = secantMethod(pH);
 //        std::cout << pH << "  " << charge(pH) << std::endl;
-        pH = newtonMethodRootCharge(pH);
+//        pH = newtonMethodRootCharge(pH);
 //        std::cout << pH << "  " << charge(pH) << std::endl;
 //        std::cout << "---------------" << std::endl;
 
