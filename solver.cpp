@@ -24,8 +24,11 @@ Solver::Solver(DiffusionScheme *scheme, int N, double T, double Patm, double Pre
     CO3.set_size(N);
 
     Ca.set_size(N);
+    Cl.set_size(N);
 
     mg_cm2_s.set_size(N);
+
+    pH.set_size(N);
 
 }
 
@@ -40,6 +43,9 @@ void Solver::run(int tSteps)
         diffuse(CO2, constants->DCO2);
         diffuse(Ca,  constants->DIon);
         diffuse(c,   constants->DIon);
+        diffuse(Cl,  constants->DIon);
+
+        output("Done diffusion");
 
         chargeBalance();
 
@@ -47,20 +53,31 @@ void Solver::run(int tSteps)
 
         precipitateDisolve();
 
+//        superOutput = true;
         gasExchange();
+//        superOutput = false;
+
+
+
 
         dump(t);
 
         cout << setw(5) << t/(tSteps-1.0)*100 << " %" << endl;
 
     }
+    cout << c << endl;
+    cout << CO2 << endl;
+    cout << Ca<< endl;
+    cout << H << endl;
+    cout << OH << endl;
+    cout << mg_cm2_s << endl;
 
 }
 
 void Solver::dump(int i)
 {
 //    c, co2, ca, H, OH, mass
-    mat A(N, 6);
+    mat A(N, 8);
 
     A.col(0) = c;
     A.col(1) = CO2;
@@ -68,9 +85,11 @@ void Solver::dump(int i)
     A.col(3) = H;
     A.col(4) = OH;
     A.col(5) = mg_cm2_s;
+    A.col(6) = Cl;
+    A.col(7) = pH;
 
     std::stringstream s;
-    s << "/tmp/concOut" << i << ".arma";
+    s << "/home/jorgehog/scratch/concOut" << i << ".arma";
 
     A.save(s.str());
 
@@ -78,11 +97,16 @@ void Solver::dump(int i)
 
 void Solver::diffuse(vec &u, double D)
 {
-    vec uNew(N-2);
+    vec uNew(N);
+    uNew(0) = u(0);
+    double fac = D*scheme->dt/(scheme->dx*scheme->dx);
     for (int i = 1; i < N-1; ++i) {
-        uNew(i-1) = u(i) + scheme->nextTimeStep(u, D, i);
+        uNew(i) = u(i) + fac*(u(i+1) -2*u(i) + u(i-1));
     }
-    u(span(1, N-2)) = uNew;
+    using namespace std;
+//    std::cout << D << endl << scheme->dt << endl << scheme->dx << "\n-----"<<std::endl;
+    uNew(N-1) = u(N-1) + D*(-u(N-1) + u(N-2));
+    u = uNew;
 }
 
 void Solver::iterateKinetics()
@@ -92,6 +116,31 @@ void Solver::iterateKinetics()
     CO2 += scheme->dt*dCO2;
     c   -= scheme->dt*dCO2;
 
+
+    output("Done kinetics");
+
+
+}
+
+void Solver::output(std::string header)
+{
+    if (!superOutput) return;
+
+    cout.precision(15);
+    cout.setf(ios::fixed);
+
+    int a;
+    H.raw_print("H = ");
+    OH.raw_print("OH = ");
+    HCO3.raw_print("HCO3 = ");
+    CO3.raw_print("CO3 = ");
+    mg_cm2_s.raw_print("mg_cm2_s = ");
+    CO2.raw_print("CO2 = ");
+    Ca.raw_print("Ca = ");
+    c.raw_print("c = ");
+    Cl.raw_print("Cl = ");
+    std::cout << header << std::endl;
+    std::cin >> a;
 }
 
 
@@ -99,19 +148,25 @@ void Solver::iterateKinetics()
 void Solver::setBoundaryAndInitialConditions()
 {
 
-//    CO2.fill(KH()*Patm); //Henry's law
-    CO2.zeros();
+    Constants c2(373.15);
+    CO2.fill(c2.KH*Patm); //Henry's law
+    CO2(N-1) = KH()*Patm;
+    CO2(0) = 0;
+//    CO2.zeros();
     c.zeros();
 
-    Cl = 0.046;
-    Ca.fill(0.5*Cl);
-//    K = 0.02;
-    K = 0;
+    double ClPipe = 0.046;
+    Ca.fill(0.5*ClPipe);
+    Cl.fill(ClPipe);
+    Cl(0) = 0;
+
 
     H.zeros();
 
     OH.zeros();
-    OH(0) = 2*Ca(0);
+
+    OH(0) = ClPipe;
+//    H(0) = KW()/OH(0);
 
     HCO3.zeros();
     CO3.zeros();
@@ -128,42 +183,167 @@ double Solver::charge(double pH)
     double OHp = KW()/Hp;
     double HCO3p = Hp*c(j)/(K2()+Hp);
     double CO3p = K2()*HCO3p/Hp;
-    double q = 2*Ca(j) + Hp + K - HCO3p - 2*CO3p - OHp - Cl;
+    double q = 2*Ca(j) + Hp - HCO3p - 2*CO3p - OHp - Cl(j);
+
+//    return pH*pH - 2;
 
     return q;
 }
 
+double Solver::chargeDeriv(double pH)
+{
+
+//    return (charge(pH + 0.001) - charge(pH - 0.001))/0.002;
+    double Hp = pow(10.0, -pH);
+    double HCO3p = Hp*c(j)/(K2()+Hp);
+
+    //  double OHp = KW()/Hp;
+    //    double CO3p = K2()*HCO3p/Hp;
+    //    double dHCO3dP = dHCO3dH*dHdP;
+    //    double dCO3dP = dCO3dH*dHdP;
+    //    double dOHdP = dOHdH*dHdP;
+
+
+    //Setting up partial derivatives.
+    double dHdP = -log(10)*Hp;
+
+    double dHCO3dH = c(j)*(K2()*(1-Hp) + Hp)/((K2()+Hp)*(K2() + Hp));
+
+    double dCO3dH = K2()*(dHCO3dH*Hp - HCO3p)/(Hp*Hp);
+
+    double dOHdH = -KW()/(Hp*Hp);
+
+//    return 2*pH;
+
+    return (1 - dHCO3dH - 2*dCO3dH - dOHdH)*dHdP;
+
+}
+
+double Solver::fixPoint(double start)
+{
+
+    double eps = 1E-15;
+    int NMAX = (int)1E5;
+
+    int N = 0;
+
+
+    while ((fabs(charge(start)) > eps) && (N < NMAX)) {
+
+        start = charge(start) - start;
+        N++;
+    }
+
+    return start;
+
+
+
+}
+
 double Solver::bisectRootCharge()
 {
-    int Nmax = 1E5;
+    int Nmax = 1E3;
     int N = 0;
 
     double a = 0;
     double b = 14;
-    double c;
+    double C;
 
-    double eps = 1E-10;
+    double eps = 0;
+
+
+    double delta = 0.001;
+
+//    double bX = b;
+    while(charge(a)*charge(b) > 0) {
+        b -= delta;
+
+        if (b < a) {
+            std::cout << "EXPRESSION HAS NO ROOTS!!" << std::endl;
+            return 0;
+        }
+    }
+
+//    if (b != bX) {
+//        std::cout << "YEEHAA" << std::endl;
+//        std::cout << bX << "  " << b << std::endl;
+//    }
+//    std::cout << charge(a)*charge(b) << std::endl;
+
 
     while (N < Nmax){
-        c = (a + b)/2;
+        C = (a + b)/2;
 
-        if (fabs(charge(c)) < eps){
-            return c;
+        if (fabs(charge(C)) < eps){
+            return C;
         }
 
-        if (charge(a)*charge(c) > 0) {
-            a = c;
+        if (charge(a)*charge(C) > 0) {
+            a = C;
         } else {
-            b = c;
+            b = C;
         }
 
         N++;
     }
 
-    std::cout << "bisection failed " << charge(c) << std::endl;
+    return C;
 
-    return c;
+}
 
+double Solver::newtonMethodRootCharge(double start)
+{
+    double a0 = 0;
+    double a1 = start;
+
+    double eps = 1E-15;
+    int NMAX = (int)1E5;
+
+    int N = 0;
+
+//    double deriv = (charge(a1 + 0.001) - charge(a1 - 0.001))/0.002;
+//    std::cout << deriv << "  " << chargeDeriv(a1) << std::endl;
+//    exit(1);
+
+    while ((fabs(charge(a1)) > eps) && (N < NMAX)) {
+
+        a0 = a1;
+
+        a1 = a0 - charge(a0)/chargeDeriv(a0);
+
+        N++;
+//        std::cout << "new solution "<< a1<< "  " << fabs(charge(a1)) <<  std::endl;
+    }
+
+//    std::cout << N << std::endl;
+
+    return a1;
+}
+
+double Solver::secantMethod(double start)
+{
+
+    double a2 = 0;
+    double a1 = start - start/10;
+    double a0 = start + start/10;
+
+    double eps = 1E-15;
+    int NMAX = (int)1E5;
+
+    int N = 0;
+
+
+    while ((fabs(charge(a1)) > eps) && (N < NMAX)) {
+
+        a2 = a0 - charge(a0)*(a1-a0)/(charge(a1)-charge(a0));
+
+        a0 = a1;
+        a1 = a2;
+
+        N++;
+    }
+
+    return a1;
 }
 
 void Solver::chargeBalance()
@@ -174,8 +354,16 @@ void Solver::chargeBalance()
     //member j is needed by charge function.
     for (j = 0; j < N; ++j) {
 
+//        pH = fixPoint(7);
         pH = bisectRootCharge();
+//        std::cout << pH << "  " << charge(pH) << std::endl;
+//        pH = secantMethod(pH);
+//        std::cout << pH << "  " << charge(pH) << std::endl;
+        pH = newtonMethodRootCharge(pH);
+//        std::cout << pH << "  " << charge(pH) << std::endl;
+//        std::cout << "---------------" << std::endl;
 
+        this->pH(j) = pH;
         H(j) = pow(10.0, -pH);
         OH(j)   = KW()/H(j);             // Eq. (9)
         HCO3(j) = H(j)*c(j)/(K2()+H(j)); // Eq. (10)
@@ -184,6 +372,7 @@ void Solver::chargeBalance()
 
 
 
+    output("Done chargeBalance");
 }
 
 void Solver::gasExchange()
@@ -193,6 +382,10 @@ void Solver::gasExchange()
 
     double FCO2 = k*(KH()*Pres - CO2(N-1));
     CO2(N-1) += scheme->dt*FCO2/scheme->dx;
+
+
+    output("Done gas");
+
 
 
 }
@@ -213,6 +406,8 @@ void Solver::precipitateDisolve()
 
     }
 
+
+    output("Done dissolve");
 
 
 }

@@ -6,7 +6,7 @@
 ExplicitEuler::ExplicitEuler(double dt, double dx) :
     DiffusionScheme(dt, dx)
 {
-    assert(dt > dx && "invalid choise of time step. Solution will not converge.");
+    assert(dt < dx && "invalid choise of time step. Solution will not converge.");
 }
 
 double ExplicitEuler::nextTimeStep(const arma::mat &u_t, double & D, const int & i) const

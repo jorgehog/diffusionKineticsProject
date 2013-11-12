@@ -42,15 +42,15 @@ public:
         KH = pow(10.0, 108.3865 - 6919.53/T + 0.01985076*T - 40.45154*log10(T) + 669365/(T*T));
 
 
-        std::cout << DCO2 << std::endl;
-        std::cout << DIon << std::endl;
-        std::cout << k1   << std::endl;
-        std::cout << k2   << std::endl;
-        std::cout << ka   << std::endl;
-        std::cout << kM2  << std::endl;
-        std::cout << KW   << std::endl;
-        std::cout << K2   << std::endl;
-        std::cout << KH   << std::endl;
+        std::cout << "DCO2 " << DCO2 << std::endl;
+        std::cout << "DION " << DIon << std::endl;
+        std::cout << "k1   " << k1   << std::endl;
+        std::cout << "k2   " << k2   << std::endl;
+        std::cout << "ka   " << ka   << std::endl;
+        std::cout << "k-2  " << kM2  << std::endl;
+        std::cout << "KW   " << KW   << std::endl;
+        std::cout << "K2   " << K2   << std::endl;
+        std::cout << "KH   " << KH   << std::endl;
 
 
     }

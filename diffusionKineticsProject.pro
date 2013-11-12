@@ -28,3 +28,7 @@ release {
     QMAKE_CXXFLAGS += -O3 -DARMA_NO_DEBUG
 
 }
+
+debug {
+    QMAKE_CXXFLAGS += -g
+}

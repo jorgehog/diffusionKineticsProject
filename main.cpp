@@ -17,7 +17,7 @@ int main(int argc, char ** argv)
     assert(argc > 1 && "Config file not supplied.");
     configParams cfgParams;
 
-    DCViz viz("/tmp/concOut0.arma");
+    DCViz viz("/home/jorgehog/scratch/concOut0.arma");
     viz.launch(true, 0, 16, 14);
 
     parseConfigFile(argv[1], cfgParams);
@@ -65,7 +65,7 @@ DiffusionScheme* selectScheme(SCEMETYPE type, double dx, double dt) {
     switch (type) {
 
     case EXPLICIT_EULER:
-        return new ExplicitEuler(dx, dt);
+        return new ExplicitEuler(dt, dx);
         break;
 
     default:

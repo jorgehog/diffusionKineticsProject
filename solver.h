@@ -25,6 +25,8 @@ public:
     double Patm;
     double Pres;
 
+    bool superOutput = false;
+
     vec CO2;
     vec c;
 
@@ -34,8 +36,9 @@ public:
     vec CO3;
 
     vec Ca;
-    double Cl;
-    double K;
+    vec Cl;
+
+    vec pH;
 
     vec mg_cm2_s;
 
@@ -49,9 +52,15 @@ public:
 
     void iterateKinetics();
 
+    void output(std::string header);
 
     double charge(double pH);
+    double chargeDeriv(double pH);
+    double fixPoint(double start);
     double bisectRootCharge();
+    double newtonMethodRootCharge(double start);
+    double secantMethod(double start);
+
     void chargeBalance();
     int j;
 
