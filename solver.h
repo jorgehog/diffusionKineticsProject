@@ -42,10 +42,11 @@ public:
     vec pH;
 
     vec mg_cm2_s;
+    vec accumass;
 
     void run(int tSteps);
 
-    void dump(int i);
+    void dump(int i, int tSteps);
 
     void diffuse(vec & u, double D);
 
